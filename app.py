@@ -6,14 +6,22 @@ from drone_page import show_drone_page
 def main():
     st.set_page_config(page_title="나르마 드론 관리 시스템", layout="wide")
 
-    # 1. DB 연결
+    # --- [수정 구간] 배포 환경과 로컬 환경 모두 대응 ---
     try:
-        db = GoogleSheetsDB('credentials.json', '드론관리')
+        # 1. Streamlit Secrets에 설정 값이 있는지 확인 (배포 환경)
+        if "gcp_service_account" in st.secrets:
+            creds_info = dict(st.secrets["gcp_service_account"])
+            db = GoogleSheetsDB(creds_info, '드론관리')
+        # 2. 없으면 로컬 파일 사용 (컴퓨터 환경)
+        else:
+            db = GoogleSheetsDB('credentials.json', '드론관리')
+            
         ws_user = db.get_worksheet("사용자계정")
     except Exception as e:
         st.error(f"❌ 데이터베이스 연결 실패: {e}")
-        st.info("구글 시트에 '사용자계정' 탭이 있는지 확인하세요.")
+        st.info("배포 시에는 Streamlit Settings > Secrets에 인증 정보를 입력해야 합니다.")
         return
+    # ----------------------------------------------
 
     # 2. 로그인 상태 관리
     if 'logged_in' not in st.session_state:
@@ -32,11 +40,9 @@ def main():
                 u_pw = st.text_input("비밀번호", type="password")
                 if st.form_submit_button("로그인"):
                     users = ws_user.get_all_records()
-                    # 아이디/비번 일치 확인
                     user_match = next((u for u in users if str(u.get('아이디')) == u_id and str(u.get('비밀번호')) == u_pw), None)
                     
                     if user_match:
-                        # ⭐ [추가] 승인 여부 확인 (시트의 '승인여부' 열이 YES여야 함)
                         approval_status = str(user_match.get('승인여부', '')).strip().upper()
                         if approval_status == "YES":
                             st.session_state['logged_in'] = True
@@ -64,18 +70,16 @@ def main():
                     elif new_pw != new_pw_confirm:
                         st.error("비밀번호 확인이 일치하지 않습니다.")
                     else:
-                        # ⭐ [수정] 마지막에 'WAIT' 상태를 추가하여 저장
                         ws_user.append_row([
                             new_id, 
                             new_name, 
                             new_pw, 
                             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "WAIT"  # 승인여부 기본값
+                            "WAIT"
                         ])
                         st.success("✅ 가입 신청 완료! 관리자에게 문의하여 가입 신청 허가를 받고 로그인 진행해주세요.")
     
     else:
-        # --- 로그인 후 화면 ---
         st.sidebar.title(f"👤 {st.session_state['user_name']}님")
         if st.sidebar.button("로그아웃"):
             st.session_state['logged_in'] = False
