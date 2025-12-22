@@ -7,19 +7,18 @@ def main():
     st.set_page_config(page_title="나르마 드론 관리 시스템", layout="wide")
 
     # --- [수정 구간] 배포 환경과 로컬 환경 모두 대응 ---
+    # 기존 try 구문을 아래와 같이 변경
     try:
-        # 1. Streamlit Secrets에 설정 값이 있는지 확인 (배포 환경)
         if "gcp_service_account" in st.secrets:
-            creds_info = dict(st.secrets["gcp_service_account"])
+            # Secrets에서 "json_content"라는 이름의 텍스트를 가져와서 딕셔너리로 변환
+            import json
+            creds_info = json.loads(st.secrets["json_content"])
             db = GoogleSheetsDB(creds_info, '드론관리')
-        # 2. 없으면 로컬 파일 사용 (컴퓨터 환경)
         else:
             db = GoogleSheetsDB('credentials.json', '드론관리')
-            
         ws_user = db.get_worksheet("사용자계정")
     except Exception as e:
-        st.error(f"❌ 데이터베이스 연결 실패: {e}")
-        st.info("배포 시에는 Streamlit Settings > Secrets에 인증 정보를 입력해야 합니다.")
+        st.error(f"❌ 연결 실패: {e}")
         return
     # ----------------------------------------------
 
