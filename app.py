@@ -6,19 +6,20 @@ from drone_page import show_drone_page
 def main():
     st.set_page_config(page_title="나르마 드론 관리 시스템", layout="wide")
 
-    # --- [수정 구간] 배포 환경과 로컬 환경 모두 대응 ---
-    # 기존 try 구문을 아래와 같이 변경
     try:
-        if "gcp_service_account" in st.secrets:
-            # Secrets에서 "json_content"라는 이름의 텍스트를 가져와서 딕셔너리로 변환
-            import json
+        # 1. Streamlit Secrets에 'json_content'라는 키가 있는지 확인
+        if "json_content" in st.secrets:
+            # 텍스트 형태의 JSON을 딕셔너리로 변환
             creds_info = json.loads(st.secrets["json_content"])
             db = GoogleSheetsDB(creds_info, '드론관리')
         else:
+            # 로컬 환경용
             db = GoogleSheetsDB('credentials.json', '드론관리')
+        
         ws_user = db.get_worksheet("사용자계정")
     except Exception as e:
         st.error(f"❌ 연결 실패: {e}")
+        st.info("Secrets에 'json_content' 항목이 올바르게 설정되었는지 확인하세요.")
         return
     # ----------------------------------------------
 
@@ -105,3 +106,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
