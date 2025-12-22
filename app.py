@@ -1,0 +1,104 @@
+import streamlit as st
+from datetime import datetime
+from google_sheets import GoogleSheetsDB
+from drone_page import show_drone_page
+
+def main():
+    st.set_page_config(page_title="나르마 드론 관리 시스템", layout="wide")
+
+    # 1. DB 연결
+    try:
+        db = GoogleSheetsDB('credentials.json', '드론관리')
+        ws_user = db.get_worksheet("사용자계정")
+    except Exception as e:
+        st.error(f"❌ 데이터베이스 연결 실패: {e}")
+        st.info("구글 시트에 '사용자계정' 탭이 있는지 확인하세요.")
+        return
+
+    # 2. 로그인 상태 관리
+    if 'logged_in' not in st.session_state:
+        st.session_state['logged_in'] = False
+    if 'user_name' not in st.session_state:
+        st.session_state['user_name'] = ""
+
+    # 3. 화면 분기
+    if not st.session_state['logged_in']:
+        st.title("🚁 나르마 드론 통합 관리 시스템")
+        tab_login, tab_register = st.tabs(["🔒 로그인", "📝 회원가입"])
+
+        with tab_login:
+            with st.form("login_form"):
+                u_id = st.text_input("아이디")
+                u_pw = st.text_input("비밀번호", type="password")
+                if st.form_submit_button("로그인"):
+                    users = ws_user.get_all_records()
+                    # 아이디/비번 일치 확인
+                    user_match = next((u for u in users if str(u.get('아이디')) == u_id and str(u.get('비밀번호')) == u_pw), None)
+                    
+                    if user_match:
+                        # ⭐ [추가] 승인 여부 확인 (시트의 '승인여부' 열이 YES여야 함)
+                        approval_status = str(user_match.get('승인여부', '')).strip().upper()
+                        if approval_status == "YES":
+                            st.session_state['logged_in'] = True
+                            st.session_state['user_name'] = user_match.get('이름', '관리자')
+                            st.rerun()
+                        else:
+                            st.warning("⏳ 아직 관리자 승인 대기 중입니다. 관리자에게 문의하세요.")
+                    else:
+                        st.error("아이디 또는 비밀번호가 일치하지 않습니다.")
+
+        with tab_register:
+            with st.form("register_form"):
+                st.write("### 신규 계정 등록 신청")
+                new_id = st.text_input("아이디 설정")
+                new_name = st.text_input("성함")
+                new_pw = st.text_input("비밀번호 설정", type="password")
+                new_pw_confirm = st.text_input("비밀번호 확인", type="password")
+                
+                if st.form_submit_button("가입 신청"):
+                    existing_ids = ws_user.col_values(1)
+                    if not (new_id and new_name and new_pw):
+                        st.warning("모든 정보를 입력해 주세요.")
+                    elif new_id in existing_ids:
+                        st.error("이미 사용 중인 아이디입니다.")
+                    elif new_pw != new_pw_confirm:
+                        st.error("비밀번호 확인이 일치하지 않습니다.")
+                    else:
+                        # ⭐ [수정] 마지막에 'WAIT' 상태를 추가하여 저장
+                        ws_user.append_row([
+                            new_id, 
+                            new_name, 
+                            new_pw, 
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "WAIT"  # 승인여부 기본값
+                        ])
+                        st.success("✅ 가입 신청 완료! 관리자에게 문의하여 가입 신청 허가를 받고 로그인 진행해주세요.")
+    
+    else:
+        # --- 로그인 후 화면 ---
+        st.sidebar.title(f"👤 {st.session_state['user_name']}님")
+        if st.sidebar.button("로그아웃"):
+            st.session_state['logged_in'] = False
+            st.rerun()
+
+        st.sidebar.divider()
+        st.sidebar.subheader("📋 메인 메뉴")
+        
+        menu = st.sidebar.radio(
+            "이동할 페이지 선택",
+            ["🚁 기체 관리", "🔋 배터리 관리", "📊 데이터 통계"],
+            index=0
+        )
+
+        if menu == "🚁 기체 관리":
+            show_drone_page() 
+        elif menu == "🔋 배터리 관리":
+            st.title("🔋 배터리 통합 관리")
+            st.write("---")
+            st.info("배터리 관리 모듈을 연결해 주세요.")
+        elif menu == "📊 데이터 통계":
+            st.title("📊 데이터 대시보드")
+            st.info("준비 중인 기능입니다.")
+
+if __name__ == "__main__":
+    main()
