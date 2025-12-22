@@ -8,19 +8,29 @@ def main():
     st.set_page_config(page_title="나르마 드론 관리 시스템", layout="wide")
 
     try:
-        # 배포(Streamlit Cloud): Secrets 사용
-        if "gcp_service_account" in st.secrets and "json_content" in st.secrets["gcp_service_account"]:
-            creds_info = json.loads(st.secrets["gcp_service_account"]["json_content"])
-            db = GoogleSheetsDB(creds_info, "드론관리")
-        else:
-            # 로컬: credentials.json 사용
-            db = GoogleSheetsDB("credentials.json", "드론관리")
+        print("[BOOT] main start")
 
+        if "gcp_service_account" in st.secrets and "json_content" in st.secrets["gcp_service_account"]:
+            print("[BOOT] secrets found")
+            creds_info = json.loads(st.secrets["gcp_service_account"]["json_content"])
+            print("[BOOT] json.loads ok")
+            db = GoogleSheetsDB(creds_info, "드론관리")
+            print("[BOOT] GoogleSheetsDB init ok")
+        else:
+            print("[BOOT] using credentials.json")
+            db = GoogleSheetsDB("credentials.json", "드론관리")
+            print("[BOOT] GoogleSheetsDB init ok (local)")
+
+        print("[BOOT] get worksheet 사용자계정")
         ws_user = db.get_worksheet("사용자계정")
+        print("[BOOT] worksheet ok")
 
     except Exception as e:
+        print(f"[BOOT][ERR] {repr(e)}")
         st.error(f"❌ 연결 실패: {e}")
         return
+
+    st.success("✅ 부팅/연결 완료")
     # ----------------------------------------------
 
     # 2. 로그인 상태 관리
@@ -106,5 +116,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
