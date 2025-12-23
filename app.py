@@ -4,7 +4,11 @@ import json
 
 from google_sheets import GoogleSheetsDB
 from drone_page import show_drone_page
+from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parent      # .../NarmaDroneApp/app
+PROJECT_ROOT = BASE_DIR.parent                  # .../NarmaDroneApp
+CRED_PATH = PROJECT_ROOT / "secrets" / "credentials.json"
 
 def init_db():
     """
@@ -141,3 +145,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
